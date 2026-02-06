@@ -24,12 +24,12 @@ if (!MONGO_URI) {
 
 // --- Schema & Model ---
 const clientSchema = new mongoose.Schema({
-  id: String, // Mantendo compatibilidade com o UUID gerado no app
+  id: String,
   name: String,
-  cpf: String,
+  phone: String,
   plate: String,
-  washPrice: Number,
-  deliveryTime: String, // ISO String
+  carModel: String,
+  deliveryTime: String,
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -74,7 +74,12 @@ app.get("/clients/search", async (req, res) => {
   try {
     const regex = new RegExp(q, "i"); // Case insensitive
     const clients = await Client.find({
-      $or: [{ name: regex }, { cpf: regex }, { plate: regex }],
+      $or: [
+        { name: regex },
+        { plate: regex },
+        { phone: regex },
+        { carModel: regex },
+      ],
     }).sort({ createdAt: -1 });
     res.json(clients);
   } catch (error) {
