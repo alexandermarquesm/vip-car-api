@@ -108,6 +108,60 @@ app.post("/services", async (req, res) => {
   }
 });
 
+// List Services (Queue)
+app.get("/services", async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = status ? { status } : { status: { $ne: "cancelled" } }; // Default: All non-cancelled
+
+    const services = await Wash.aggregate([
+      { $match: filter },
+      {
+        $lookup: {
+          from: "clients", // Collection name (mongoose pluralizes 'Client' to 'clients')
+          localField: "clientId",
+          foreignField: "id",
+          as: "clientInfo",
+        },
+      },
+      { $unwind: "$clientInfo" }, // Flatten the array
+      {
+        $project: {
+          _id: 1,
+          plate: 1,
+          carModel: 1,
+          price: 1,
+          entryTime: 1,
+          deliveryTime: 1,
+          status: 1,
+          clientName: "$clientInfo.name",
+          clientPhone: "$clientInfo.phone",
+        },
+      },
+      { $sort: { deliveryTime: 1 } }, // Sort by nearest delivery
+    ]);
+
+    res.json(services);
+  } catch (error) {
+    console.error("Erro ao buscar serviços:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update Service Status
+app.patch("/services/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const wash = await Wash.findByIdAndUpdate(id, { status }, { new: true });
+
+    res.json(wash);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create Client (Legacy/Direct) - Optional, kept for compatibility if needed
 app.post("/clients", async (req, res) => {
   try {
