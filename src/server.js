@@ -60,6 +60,21 @@ app.post("/services", async (req, res) => {
   try {
     const { name, phone, plate, carModel, washPrice, deliveryTime } = req.body;
 
+    // 0. Validator
+    if (carModel && carModel.length > 30) {
+      return res.status(400).json({
+        error: "O modelo do carro deve ter no máximo 30 caracteres.",
+      });
+    }
+
+    // Check for duplicate pending service
+    const existingWash = await Wash.findOne({ plate, status: "pending" });
+    if (existingWash) {
+      return res.status(409).json({
+        error: "Este carro já possui uma lavagem pendente na fila.",
+      });
+    }
+
     // 1. Find or Create Client
     let client = await Client.findOne({ plate });
 
