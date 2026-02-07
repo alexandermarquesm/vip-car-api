@@ -126,8 +126,21 @@ app.post("/services", async (req, res) => {
 // List Services (Queue)
 app.get("/services", async (req, res) => {
   try {
+    // Auto-update status for overdue pending services
+    await Wash.updateMany(
+      {
+        status: "pending",
+        deliveryTime: { $lt: new Date() },
+      },
+      { $set: { status: "completed" } },
+    );
+
     const { status } = req.query;
-    const filter = status ? { status } : { status: { $ne: "cancelled" } }; // Default: All non-cancelled
+    let filter = { status: { $ne: "cancelled" } }; // Default: All (except cancelled)
+
+    if (status && status !== "all") {
+      filter = { status };
+    }
 
     const services = await Wash.aggregate([
       { $match: filter },
