@@ -1,4 +1,13 @@
-require("dotenv").config();
+const dotenv = require("dotenv");
+const path = require("path");
+
+// Load .env.local if in development (default), or .env.production if explicitly set
+const envFile =
+  process.env.NODE_ENV === "production" ? ".env.production" : ".env.local";
+dotenv.config({ path: path.resolve(__dirname, "..", envFile) });
+
+// Fallback to standard .env if specific file doesn't exist or variables needed
+dotenv.config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -235,8 +244,46 @@ app.get("/clients/search", async (req, res) => {
   }
 });
 
+// Update Client
+app.put("/clients/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, plate, carModel } = req.body;
+
+    const client = await Client.findOneAndUpdate(
+      { id }, // Procura pelo ID (UUID) customizado
+      { name, phone, plate, carModel },
+      { new: true },
+    );
+
+    if (!client) {
+      return res.status(404).json({ error: "Cliente não encontrado" });
+    }
+
+    res.json(client);
+  } catch (error) {
+    console.error("Erro ao atualizar cliente:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`\n🚀 Servidor rodando na porta ${PORT}`);
+  console.log(
+    `🌍 Ambiente: ${
+      process.env.NODE_ENV === "production"
+        ? "PRODUÇÃO 🔴"
+        : "DESENVOLVIMENTO 🟢"
+    }`,
+  );
+  console.log(`📂 Arquivo env: ${envFile}`);
+  if (MONGO_URI) {
+    const hiddenUri = MONGO_URI.replace(
+      /(mongodb(?:\+srv)?:\/\/)([^:]+):([^@]+)@/,
+      "$1$2:*****@",
+    );
+    console.log(`🛢️  MongoDB: ${hiddenUri}\n`);
+  }
 });
