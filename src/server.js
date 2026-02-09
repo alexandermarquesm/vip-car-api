@@ -126,14 +126,14 @@ app.post("/services", async (req, res) => {
 // List Services (Queue)
 app.get("/services", async (req, res) => {
   try {
-    // Auto-update status for overdue pending services
-    await Wash.updateMany(
-      {
-        status: "pending",
-        deliveryTime: { $lt: new Date() },
-      },
-      { $set: { status: "completed" } },
-    );
+    // Auto-update status logic removed to allow manual toggle
+    // await Wash.updateMany(
+    //   {
+    //     status: "pending",
+    //     deliveryTime: { $lt: new Date() },
+    //   },
+    //   { $set: { status: "completed" } },
+    // );
 
     const { status } = req.query;
     let filter = { status: { $ne: "cancelled" } }; // Default: All (except cancelled)
