@@ -41,6 +41,7 @@ const washSchema = new mongoose.Schema({
   entryTime: { type: Date, default: Date.now },
   deliveryTime: Date,
   status: { type: String, default: "pending" }, // pending, completed, cancelled
+  paymentMethod: String, // money, card, pix
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -67,7 +68,15 @@ app.get("/", (req, res) => {
 // Register Service (Upsert Client + Create Wash)
 app.post("/services", async (req, res) => {
   try {
-    const { name, phone, plate, carModel, washPrice, deliveryTime } = req.body;
+    const {
+      name,
+      phone,
+      plate,
+      carModel,
+      washPrice,
+      deliveryTime,
+      paymentMethod,
+    } = req.body;
 
     // 0. Validator
     if (carModel && carModel.length > 30) {
@@ -116,6 +125,7 @@ app.post("/services", async (req, res) => {
           : "0",
       ),
       deliveryTime: new Date(deliveryTime),
+      paymentMethod,
       status: "pending",
     });
 
@@ -136,19 +146,33 @@ app.post("/services", async (req, res) => {
 app.get("/services", async (req, res) => {
   try {
     // Auto-update status logic removed to allow manual toggle
-    // await Wash.updateMany(
-    //   {
-    //     status: "pending",
-    //     deliveryTime: { $lt: new Date() },
-    //   },
-    //   { $set: { status: "completed" } },
-    // );
+    // Auto-update status logic re-enabled
+    await Wash.updateMany(
+      {
+        status: "pending",
+        deliveryTime: { $lt: new Date() },
+      },
+      { $set: { status: "completed" } },
+    );
 
-    const { status } = req.query;
+    const { status, date } = req.query;
     let filter = { status: { $ne: "cancelled" } }; // Default: All (except cancelled)
 
     if (status && status !== "all") {
-      filter = { status };
+      filter.status = status;
+    }
+
+    if (date) {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      filter.deliveryTime = {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      };
     }
 
     const services = await Wash.aggregate([
@@ -171,6 +195,7 @@ app.get("/services", async (req, res) => {
           entryTime: 1,
           deliveryTime: 1,
           status: 1,
+          paymentMethod: 1, // Include payment method
           clientName: "$clientInfo.name",
           clientPhone: "$clientInfo.phone",
         },
