@@ -147,6 +147,8 @@ app.get("/services", async (req, res) => {
   try {
     // Auto-update status logic removed to allow manual toggle
     // Auto-update status logic re-enabled
+    // Auto-update status logic removed to allow manual toggle
+    /*
     await Wash.updateMany(
       {
         status: "pending",
@@ -154,6 +156,7 @@ app.get("/services", async (req, res) => {
       },
       { $set: { status: "completed" } },
     );
+    */
 
     const { status, date } = req.query;
     let filter = { status: { $ne: "cancelled" } }; // Default: All (except cancelled)
@@ -214,9 +217,14 @@ app.get("/services", async (req, res) => {
 app.patch("/services/:id/status", async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, paymentMethod } = req.body;
 
-    const wash = await Wash.findByIdAndUpdate(id, { status }, { new: true });
+    const updateData = { status };
+    if (status === "completed" && paymentMethod) {
+      updateData.paymentMethod = paymentMethod;
+    }
+
+    const wash = await Wash.findByIdAndUpdate(id, updateData, { new: true });
 
     res.json(wash);
   } catch (error) {
