@@ -41,7 +41,13 @@ const washSchema = new mongoose.Schema({
   entryTime: { type: Date, default: Date.now },
   deliveryTime: Date,
   status: { type: String, default: "pending" }, // pending, completed, cancelled
-  paymentMethod: String, // money, card, pix
+  paymentMethod: String, // Legacy: money, card, pix (kept for backward compatibility)
+  payments: [
+    {
+      method: { type: String, enum: ["money", "card", "pix"] },
+      amount: Number,
+    },
+  ],
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -125,7 +131,7 @@ app.post("/services", async (req, res) => {
           : "0",
       ),
       deliveryTime: new Date(deliveryTime),
-      paymentMethod,
+      paymentMethod, // Optional initial method
       status: "pending",
     });
 
@@ -199,6 +205,7 @@ app.get("/services", async (req, res) => {
           deliveryTime: 1,
           status: 1,
           paymentMethod: 1, // Include payment method
+          payments: 1, // Include payments array
           clientName: "$clientInfo.name",
           clientPhone: "$clientInfo.phone",
         },
@@ -217,11 +224,29 @@ app.get("/services", async (req, res) => {
 app.patch("/services/:id/status", async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, paymentMethod } = req.body;
+    const { status, paymentMethod, payments } = req.body;
 
     const updateData = { status };
-    if (status === "completed" && paymentMethod) {
-      updateData.paymentMethod = paymentMethod;
+
+    if (status === "completed") {
+      if (payments && Array.isArray(payments)) {
+        updateData.payments = payments;
+        // Determine primary payment method (the one with the highest amount or the first one)
+        // This keeps backward compatibility for simple display
+        if (payments.length > 0) {
+          const mainPayment = payments.reduce((prev, current) =>
+            prev.amount > current.amount ? prev : current,
+          );
+          updateData.paymentMethod = mainPayment.method;
+        }
+      } else if (paymentMethod) {
+        // Fallback for single payment method if payments array not provided
+        updateData.paymentMethod = paymentMethod;
+        // Also populate payments array for consistency
+        // We need to fetch the service first to get the price if we want to be accurate,
+        // but for now let's just update the method.
+        // Ideally, the frontend should always send `payments` now.
+      }
     }
 
     const wash = await Wash.findByIdAndUpdate(id, updateData, { new: true });
