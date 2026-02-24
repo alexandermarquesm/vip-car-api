@@ -336,6 +336,48 @@ app.patch("/services/:id/status", async (req, res) => {
   }
 });
 
+// Update Service Price
+app.patch("/services/:id/price", async (req, res) => {
+  try {
+    const { id } = req.params;
+    let { price } = req.body;
+
+    const finalPrice = price || 0;
+
+    const currentWash = await Wash.findById(id);
+    if (!currentWash) {
+      return res.status(404).json({ error: "Serviço não encontrado" });
+    }
+
+    const updateData = {
+      price: finalPrice,
+      // Recalculate netPrice based on current paymentMethod if it exists
+      netPrice: currentWash.paymentMethod
+        ? calculateNetPrice(finalPrice, currentWash.paymentMethod)
+        : finalPrice,
+    };
+
+    // If there's a payments array, we should ideally redistribute or recalculate.
+    // However, since we only edit pending services (usually), netPrice fallback is OK.
+    // If it's already completed, the logic below handles multiple payments:
+    if (
+      currentWash.payments &&
+      currentWash.payments.length > 0 &&
+      currentWash.status === "completed"
+    ) {
+      // For simplicity, we don't want to mess with specific splits automatically
+      // so we keep the proportional discount for netPrice
+      const feeRatio = currentWash.netPrice / currentWash.price;
+      updateData.netPrice = Number((finalPrice * feeRatio).toFixed(2));
+    }
+
+    const wash = await Wash.findByIdAndUpdate(id, updateData, { new: true });
+    res.json(wash);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create Client (Legacy/Direct) - Optional, kept for compatibility if needed
 app.post("/clients", async (req, res) => {
   try {
