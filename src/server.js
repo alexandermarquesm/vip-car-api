@@ -38,6 +38,7 @@ const washSchema = new mongoose.Schema({
   plate: String,
   carModel: String,
   price: Number,
+  netPrice: Number, // Valor líquido após taxas (ex: maquininha de cartão)
   entryTime: { type: Date, default: Date.now },
   deliveryTime: Date,
   status: { type: String, default: "pending" }, // pending, completed, cancelled
@@ -63,6 +64,17 @@ const clientSchema = new mongoose.Schema({
 
 const Client = mongoose.model("Client", clientSchema);
 const Wash = mongoose.model("Wash", washSchema);
+
+// Taxa do Cartão de Crédito/Débito (Ex: aprox 0.8833% baseado em 60 -> 59.47)
+const CARD_FEE_PERCENTAGE = 0.0088333;
+
+function calculateNetPrice(amount, method) {
+  if (method === "card") {
+    // Retorna o valor descontado da taxa (arredondado para 2 casas decimais)
+    return Number((amount - amount * CARD_FEE_PERCENTAGE).toFixed(2));
+  }
+  return amount; // Sem desconto para dinheiro/pix
+}
 
 // --- Routes ---
 
@@ -121,15 +133,18 @@ app.post("/services", async (req, res) => {
     }
 
     // 2. Create Wash Record
+    const numericPrice = parseFloat(
+      washPrice
+        ? washPrice.replace("R$", "").replace(".", "").replace(",", ".")
+        : "0",
+    );
+
     const newWash = new Wash({
       clientId: client.id, // Store the custom ID or _id
       plate: client.plate,
       carModel: client.carModel,
-      price: parseFloat(
-        washPrice
-          ? washPrice.replace("R$", "").replace(".", "").replace(",", ".")
-          : "0",
-      ),
+      price: numericPrice,
+      netPrice: calculateNetPrice(numericPrice, paymentMethod),
       deliveryTime: new Date(deliveryTime),
       paymentMethod, // Optional initial method
       status: "pending",
@@ -201,6 +216,7 @@ app.get("/services", async (req, res) => {
           plate: 1,
           carModel: 1,
           price: 1,
+          netPrice: 1,
           entryTime: 1,
           deliveryTime: 1,
           status: 1,
@@ -226,26 +242,41 @@ app.patch("/services/:id/status", async (req, res) => {
     const { id } = req.params;
     const { status, paymentMethod, payments } = req.body;
 
+    // Precisamos buscar o documento original para o cálculo correto dos juros
+    // caso o method venha vazio ou só um pagamento
+    const currentWash = await Wash.findById(id);
+    if (!currentWash) {
+      return res.status(404).json({ error: "Serviço não encontrado" });
+    }
+
     const updateData = { status };
 
     if (status === "completed") {
       if (payments && Array.isArray(payments)) {
         updateData.payments = payments;
-        // Determine primary payment method (the one with the highest amount or the first one)
-        // This keeps backward compatibility for simple display
+        // Determine primary payment method
         if (payments.length > 0) {
           const mainPayment = payments.reduce((prev, current) =>
             prev.amount > current.amount ? prev : current,
           );
           updateData.paymentMethod = mainPayment.method;
+
+          // Calcular netPrice somando cada pagamento e seu desconto individual
+          let totalNet = 0;
+          for (const payment of payments) {
+            totalNet += calculateNetPrice(payment.amount, payment.method);
+          }
+          updateData.netPrice = Number(totalNet.toFixed(2));
         }
       } else if (paymentMethod) {
         // Fallback for single payment method if payments array not provided
         updateData.paymentMethod = paymentMethod;
-        // Also populate payments array for consistency
-        // We need to fetch the service first to get the price if we want to be accurate,
-        // but for now let's just update the method.
-        // Ideally, the frontend should always send `payments` now.
+
+        // Calcular netPrice com base no valor total atual e no novo metodo
+        updateData.netPrice = calculateNetPrice(
+          currentWash.price,
+          paymentMethod,
+        );
       }
     }
 
