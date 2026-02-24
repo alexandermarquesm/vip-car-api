@@ -55,10 +55,9 @@ const washSchema = new mongoose.Schema({
 const clientSchema = new mongoose.Schema({
   id: String,
   name: String,
-  phone: String,
-  plate: { type: String, unique: true }, // Ensure uniqueness
+  phone: { type: String, unique: true }, // Agora o telefone é a chave única do cliente
+  plate: String, // Placa não é mais única no cadastro do cliente (um cliente pode ter vários carros)
   carModel: String,
-  // washPrice removed from here, moved to Wash
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -111,17 +110,20 @@ app.post("/services", async (req, res) => {
       });
     }
 
-    // 1. Find or Create Client
-    let client = await Client.findOne({ plate });
+    // 1. Find or Create Client by PHONE
+    let client = null;
+    if (phone) {
+      client = await Client.findOne({ phone });
+    }
 
     if (client) {
-      // Update existing client info
+      // Update existing client info (Name and last used vehicle)
       client.name = name;
-      client.phone = phone;
+      client.plate = plate;
       client.carModel = carModel;
       await client.save();
     } else {
-      // Create new client
+      // Create new client (Phone is the key)
       client = new Client({
         id: crypto.randomUUID(),
         name,
