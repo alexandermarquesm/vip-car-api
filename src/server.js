@@ -56,8 +56,14 @@ const clientSchema = new mongoose.Schema({
   id: String,
   name: String,
   phone: { type: String, unique: true }, // Chave única do cliente
-  plate: { type: String, unique: true }, // Garante que uma placa não pertença a dois donos ao mesmo tempo
-  carModel: String,
+  plate: String, // Última placa utilizada (opcional e não único)
+  carModel: String, // Último modelo utilizado
+  vehicles: [
+    {
+      plate: String,
+      carModel: String,
+    },
+  ],
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -129,25 +135,43 @@ app.post("/services", async (req, res) => {
 
     // 1. Find or Create Client by PHONE
     let client = null;
-    if (phone) {
-      client = await Client.findOne({ phone });
+    if (sanitizedPhone) {
+      client = await Client.findOne({ phone: sanitizedPhone });
     }
 
     if (client) {
-      // Update existing client info (Name and last used vehicle)
+      // Update existing client info
       client.name = name;
-      client.plate = plate;
-      client.carModel = carModel;
+
+      if (plate) {
+        client.plate = plate;
+        client.carModel = carModel;
+
+        // Add to vehicles array if not present
+        const hasVehicle = client.vehicles.some(
+          (v) => v.plate.toUpperCase() === sanitizedPlate,
+        );
+        if (!hasVehicle) {
+          client.vehicles.push({ plate: sanitizedPlate, carModel });
+        }
+      }
       await client.save();
     } else {
       // Create new client (Phone is the key)
-      client = new Client({
+      const newClientData = {
         id: crypto.randomUUID(),
         name,
-        phone,
-        plate,
-        carModel,
-      });
+        phone: sanitizedPhone,
+        vehicles: [],
+      };
+
+      if (plate) {
+        newClientData.plate = plate;
+        newClientData.carModel = carModel;
+        newClientData.vehicles.push({ plate: sanitizedPlate, carModel });
+      }
+
+      client = new Client(newClientData);
       await client.save();
     }
 
@@ -368,6 +392,18 @@ app.put("/clients/:id", async (req, res) => {
       { name, phone, plate, carModel },
       { new: true },
     );
+
+    // If plate changed, ensure it's in the vehicles array
+    if (client && plate) {
+      const sanitizedPlate = plate.trim().toUpperCase();
+      const hasVehicle = client.vehicles.some(
+        (v) => v.plate.toUpperCase() === sanitizedPlate,
+      );
+      if (!hasVehicle) {
+        client.vehicles.push({ plate: sanitizedPlate, carModel });
+        await client.save();
+      }
+    }
 
     if (!client) {
       return res.status(404).json({ error: "Cliente não encontrado" });
