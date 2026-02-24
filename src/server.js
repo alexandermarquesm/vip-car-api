@@ -55,8 +55,8 @@ const washSchema = new mongoose.Schema({
 const clientSchema = new mongoose.Schema({
   id: String,
   name: String,
-  phone: { type: String, unique: true }, // Agora o telefone é a chave única do cliente
-  plate: String, // Placa não é mais única no cadastro do cliente (um cliente pode ter vários carros)
+  phone: { type: String, unique: true }, // Chave única do cliente
+  plate: { type: String, unique: true }, // Garante que uma placa não pertença a dois donos ao mesmo tempo
   carModel: String,
   createdAt: { type: Date, default: Date.now },
 });
@@ -95,6 +95,9 @@ app.post("/services", async (req, res) => {
       paymentMethod,
     } = req.body;
 
+    const sanitizedPlate = plate ? plate.trim().toUpperCase() : "";
+    const sanitizedPhone = phone ? phone.replace(/\D/g, "") : ""; // Remove máscara para busca
+
     // 0. Validator
     if (carModel && carModel.length > 30) {
       return res.status(400).json({
@@ -103,11 +106,25 @@ app.post("/services", async (req, res) => {
     }
 
     // Check for duplicate pending service
-    const existingWash = await Wash.findOne({ plate, status: "pending" });
+    const existingWash = await Wash.findOne({
+      plate: sanitizedPlate,
+      status: "pending",
+    });
     if (existingWash) {
       return res.status(409).json({
-        error: "Este carro já possui uma lavagem pendente na fila.",
+        error: `O veículo ${sanitizedPlate} já possui uma lavagem pendente na fila (desde ${existingWash.createdAt.toLocaleString()}).`,
       });
+    }
+
+    // Check if plate belongs to another phone
+    const otherOwner = await Client.findOne({ plate: sanitizedPlate });
+    if (otherOwner) {
+      const otherOwnerPhone = otherOwner.phone.replace(/\D/g, "");
+      if (otherOwnerPhone !== sanitizedPhone) {
+        return res.status(400).json({
+          error: `A placa ${sanitizedPlate} já está cadastrada para outro cliente (${otherOwner.name}).`,
+        });
+      }
     }
 
     // 1. Find or Create Client by PHONE
@@ -205,13 +222,18 @@ app.get("/services", async (req, res) => {
       { $match: filter },
       {
         $lookup: {
-          from: "clients", // Collection name (mongoose pluralizes 'Client' to 'clients')
+          from: "clients",
           localField: "clientId",
           foreignField: "id",
           as: "clientInfo",
         },
       },
-      { $unwind: "$clientInfo" }, // Flatten the array
+      {
+        $unwind: {
+          path: "$clientInfo",
+          preserveNullAndEmptyArrays: true, // Não esconde a lavagem se o cliente sumir
+        },
+      },
       {
         $project: {
           _id: 1,
@@ -222,13 +244,13 @@ app.get("/services", async (req, res) => {
           entryTime: 1,
           deliveryTime: 1,
           status: 1,
-          paymentMethod: 1, // Include payment method
-          payments: 1, // Include payments array
-          clientName: "$clientInfo.name",
-          clientPhone: "$clientInfo.phone",
+          paymentMethod: 1,
+          payments: 1,
+          clientName: { $ifNull: ["$clientInfo.name", "Cliente Desconhecido"] },
+          clientPhone: { $ifNull: ["$clientInfo.phone", "S/ Tel"] },
         },
       },
-      { $sort: { deliveryTime: 1 } }, // Sort by nearest delivery
+      { $sort: { deliveryTime: 1 } },
     ]);
 
     res.json(services);
