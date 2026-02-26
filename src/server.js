@@ -123,9 +123,11 @@ app.post("/services", async (req, res) => {
     }
 
     // Check if plate belongs to another phone
-    const otherOwner = await Client.findOne({ plate: sanitizedPlate });
+    const otherOwner = await Client.findOne({
+      $or: [{ plate: sanitizedPlate }, { "vehicles.plate": sanitizedPlate }],
+    });
     if (otherOwner) {
-      const otherOwnerPhone = otherOwner.phone.replace(/\D/g, "");
+      const otherOwnerPhone = (otherOwner.phone || "").replace(/\D/g, "");
       if (otherOwnerPhone !== sanitizedPhone) {
         return res.status(400).json({
           error: `A placa ${sanitizedPlate} já está cadastrada para outro cliente (${otherOwner.name}).`,
@@ -144,9 +146,6 @@ app.post("/services", async (req, res) => {
       client.name = name;
 
       if (plate) {
-        client.plate = plate;
-        client.carModel = carModel;
-
         // Add to vehicles array if not present
         const hasVehicle = client.vehicles.some(
           (v) => v.plate.toUpperCase() === sanitizedPlate,
@@ -166,8 +165,6 @@ app.post("/services", async (req, res) => {
       };
 
       if (plate) {
-        newClientData.plate = plate;
-        newClientData.carModel = carModel;
         newClientData.vehicles.push({ plate: sanitizedPlate, carModel });
       }
 
@@ -183,9 +180,9 @@ app.post("/services", async (req, res) => {
     );
 
     const newWash = new Wash({
-      clientId: client.id, // Store the custom ID or _id
-      plate: client.plate,
-      carModel: client.carModel,
+      clientId: client.id,
+      plate: sanitizedPlate, // Mantemos na lavagem como snapshot
+      carModel: carModel,
       price: numericPrice,
       netPrice: calculateNetPrice(numericPrice, paymentMethod),
       deliveryTime: new Date(deliveryTime),
@@ -299,6 +296,20 @@ app.patch("/services/:id/status", async (req, res) => {
 
     const updateData = { status };
 
+    // Prevent duplicate pending services for the same plate (e.g., on Undo)
+    if (status === "pending") {
+      const existingWash = await Wash.findOne({
+        plate: currentWash.plate,
+        status: "pending",
+        _id: { $ne: id },
+      });
+      if (existingWash) {
+        return res.status(409).json({
+          error: `O veículo ${currentWash.plate} já possui uma lavagem pendente na fila.`,
+        });
+      }
+    }
+
     if (status === "completed") {
       if (payments && Array.isArray(payments)) {
         updateData.payments = payments;
@@ -378,6 +389,29 @@ app.patch("/services/:id/price", async (req, res) => {
   }
 });
 
+// Full Database Backup
+app.get("/backup", async (req, res) => {
+  try {
+    const clients = await Client.find({});
+    const washes = await Wash.find({});
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      counts: {
+        clients: clients.length,
+        washes: washes.length,
+      },
+      data: {
+        clients,
+        washes,
+      },
+    });
+  } catch (error) {
+    console.error("Erro ao gerar backup:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create Client (Legacy/Direct) - Optional, kept for compatibility if needed
 app.post("/clients", async (req, res) => {
   try {
@@ -412,9 +446,9 @@ app.get("/clients/search", async (req, res) => {
     const clients = await Client.find({
       $or: [
         { name: regex },
-        { plate: regex },
         { phone: regex },
-        { carModel: regex },
+        { "vehicles.plate": regex },
+        { "vehicles.carModel": regex },
       ],
     }).sort({ createdAt: -1 });
     res.json(clients);
@@ -430,8 +464,8 @@ app.put("/clients/:id", async (req, res) => {
     const { name, phone, plate, carModel } = req.body;
 
     const client = await Client.findOneAndUpdate(
-      { id }, // Procura pelo ID (UUID) customizado
-      { name, phone, plate, carModel },
+      { id },
+      { name, phone }, // Não atualizamos mais plate/carModel no topo
       { new: true },
     );
 
