@@ -42,10 +42,13 @@ const washSchema = new mongoose.Schema({
   entryTime: { type: Date, default: Date.now },
   deliveryTime: Date,
   status: { type: String, default: "pending" }, // pending, completed, cancelled
-  paymentMethod: String, // Legacy: money, card, pix (kept for backward compatibility)
+  paymentMethod: String, // Legacy: money, card, pix, or new: convenio, credit_card, debit_card
   payments: [
     {
-      method: { type: String, enum: ["money", "card", "pix"] },
+      method: {
+        type: String,
+        enum: ["money", "card", "pix", "convenio", "credit_card", "debit_card"],
+      },
       amount: Number,
     },
   ],
@@ -70,15 +73,23 @@ const clientSchema = new mongoose.Schema({
 const Client = mongoose.model("Client", clientSchema);
 const Wash = mongoose.model("Wash", washSchema);
 
-// Taxa do Cartão de Crédito/Débito (Ex: aprox 0.8833% baseado em 60 -> 59.47)
-const CARD_FEE_PERCENTAGE = 0.0088333;
+// Taxa do Cartão de Crédito/Débito
+const CARD_FEE_PERCENTAGE_LEGACY = 0.0088333; // Fallback
+const CREDIT_CARD_FEE_PERCENTAGE = 0.0309; // 3.09%
+const DEBIT_CARD_FEE_PERCENTAGE = 0.0089; // 0.89%
 
 function calculateNetPrice(amount, method) {
-  if (method === "card") {
-    // Retorna o valor descontado da taxa (arredondado para 2 casas decimais)
-    return Number((amount - amount * CARD_FEE_PERCENTAGE).toFixed(2));
+  if (method === "credit_card") {
+    return Number((amount - amount * CREDIT_CARD_FEE_PERCENTAGE).toFixed(2));
   }
-  return amount; // Sem desconto para dinheiro/pix
+  if (method === "debit_card") {
+    return Number((amount - amount * DEBIT_CARD_FEE_PERCENTAGE).toFixed(2));
+  }
+  if (method === "card") {
+    // Retorna o valor descontado da taxa legada
+    return Number((amount - amount * CARD_FEE_PERCENTAGE_LEGACY).toFixed(2));
+  }
+  return amount; // Sem desconto para dinheiro/pix/convenio
 }
 
 // --- Routes ---
