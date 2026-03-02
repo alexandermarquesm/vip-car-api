@@ -472,25 +472,22 @@ app.get("/clients/search", async (req, res) => {
 app.put("/clients/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, plate, carModel } = req.body;
+    const { name, phone, vehicles } = req.body;
 
-    const client = await Client.findOneAndUpdate(
-      { id },
-      { name, phone }, // Não atualizamos mais plate/carModel no topo
-      { new: true },
-    );
-
-    // If plate changed, ensure it's in the vehicles array
-    if (client && plate) {
-      const sanitizedPlate = plate.trim().toUpperCase();
-      const hasVehicle = client.vehicles.some(
-        (v) => v.plate.toUpperCase() === sanitizedPlate,
-      );
-      if (!hasVehicle) {
-        client.vehicles.push({ plate: sanitizedPlate, carModel });
-        await client.save();
-      }
+    const updateData = { name, phone };
+    if (vehicles && Array.isArray(vehicles)) {
+      // Ensure plates are mapped correctly
+      updateData.vehicles = vehicles
+        .map((v) => ({
+          plate: v.plate ? v.plate.trim().toUpperCase() : "",
+          carModel: v.carModel || "",
+        }))
+        .filter((v) => v.plate !== "");
     }
+
+    const client = await Client.findOneAndUpdate({ id }, updateData, {
+      new: true,
+    });
 
     if (!client) {
       return res.status(404).json({ error: "Cliente não encontrado" });
