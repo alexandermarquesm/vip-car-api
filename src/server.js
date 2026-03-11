@@ -455,12 +455,7 @@ app.get("/clients/search", async (req, res) => {
   try {
     const regex = new RegExp(q, "i"); // Case insensitive
     const clients = await Client.find({
-      $or: [
-        { name: regex },
-        { phone: regex },
-        { "vehicles.plate": regex },
-        { "vehicles.carModel": regex },
-      ],
+      name: regex,
     }).sort({ createdAt: -1 });
     res.json(clients);
   } catch (error) {
