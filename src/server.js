@@ -55,6 +55,11 @@ const washSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+washSchema.index(
+  { plate: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: "pending" } },
+);
+
 const clientSchema = new mongoose.Schema({
   id: String,
   name: String,
@@ -133,18 +138,6 @@ app.post("/services", async (req, res) => {
       });
     }
 
-    // Check if plate belongs to another phone
-    const otherOwner = await Client.findOne({
-      $or: [{ plate: sanitizedPlate }, { "vehicles.plate": sanitizedPlate }],
-    });
-    if (otherOwner) {
-      const otherOwnerPhone = (otherOwner.phone || "").replace(/\D/g, "");
-      if (otherOwnerPhone !== sanitizedPhone) {
-        return res.status(400).json({
-          error: `A placa ${sanitizedPlate} já está cadastrada para outro cliente (${otherOwner.name}).`,
-        });
-      }
-    }
 
     // 1. Find or Create Client by PHONE
     let client = null;
@@ -209,6 +202,11 @@ app.post("/services", async (req, res) => {
       wash: newWash,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        error: "Este veículo já possui uma lavagem pendente na fila (proteção contra duplicidade).",
+      });
+    }
     console.error("Erro ao registrar serviço:", error);
     res.status(500).json({ error: error.message });
   }
