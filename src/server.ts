@@ -5,7 +5,11 @@ import { makeServiceController } from "./main/factories/controllers/ServiceContr
 import { makeClientController } from "./main/factories/controllers/ClientControllerFactory";
 import { makeAuthController } from "./main/factories/controllers/AuthControllerFactory";
 
-const startServer = async () => {
+let appInstance: any = null;
+
+const getApp = async () => {
+  if (appInstance) return appInstance;
+
   // 1. Carregar Ambiente (Validado)
   const env = loadEnv();
 
@@ -17,7 +21,6 @@ const startServer = async () => {
     const mongoose = require('mongoose');
     const collection = mongoose.connection.db.collection('washes');
     await collection.dropIndex('plate_1_status_1');
-    // console.log('Legacy index plate_1_status_1 removed successfully.');
   } catch (e) {
     // Index doesn't exist or already removed, ignore
   }
@@ -27,15 +30,26 @@ const startServer = async () => {
   const clientController = makeClientController();
   const authController = makeAuthController(env.JWT_SECRET);
   
-  const app = createApp(serviceController, clientController, authController, env.JWT_SECRET);
-
-  const PORT = env.PORT || 3000;
-  app.listen(PORT, () => {
-    // Server running
-  });
+  appInstance = createApp(serviceController, clientController, authController, env.JWT_SECRET);
+  return appInstance;
 };
 
-startServer().catch((err) => {
-  console.error("❌ Erro fatal ao iniciar o servidor:", err);
-  process.exit(1);
-});
+// Vercel / Production Export
+export default async (req: any, res: any) => {
+  const app = await getApp();
+  return app(req, res);
+};
+
+// Local Development
+if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+  getApp().then((app) => {
+    const env = loadEnv();
+    const PORT = env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor rodando localmente na porta ${PORT}`);
+    });
+  }).catch((err) => {
+    console.error("❌ Erro fatal ao iniciar o servidor local:", err);
+    process.exit(1);
+  });
+}
