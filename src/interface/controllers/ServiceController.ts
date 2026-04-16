@@ -6,6 +6,7 @@ import { UpdateServiceStatus } from "../../application/use-cases/UpdateServiceSt
 import { UpdateServicePrice } from "../../application/use-cases/UpdateServicePrice";
 import { DeleteService } from "../../application/use-cases/DeleteService";
 import { GetBackup } from "../../application/use-cases/GetBackup";
+import { AnalyzeSheet } from "../../application/use-cases/AnalyzeSheet";
 import { WashSchema, PaymentSchema } from "../../domain/schemas/WashSchema";
 import { z } from "zod";
 
@@ -16,7 +17,8 @@ export class ServiceController {
     private updateServiceStatus: UpdateServiceStatus,
     private updateServicePrice: UpdateServicePrice,
     private deleteService: DeleteService,
-    private getBackup: GetBackup
+    private getBackup: GetBackup,
+    private analyzeSheet: AnalyzeSheet
   ) {}
 
   async register(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -116,6 +118,21 @@ export class ServiceController {
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  }
+
+  async scanSheet(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: "Nenhuma imagem providenciada" });
+        return;
+      }
+
+      const rows = await this.analyzeSheet.execute(req.file.buffer, req.file.mimetype);
+      res.json(rows);
+    } catch (error: any) {
+      console.error("Erro ao escanear planilha:", error);
+      res.status(500).json({ error: error.message || "Erro interno ao processar a imagem." });
     }
   }
 }

@@ -6,7 +6,10 @@ import { UpdateServiceStatus } from "../../../application/use-cases/UpdateServic
 import { UpdateServicePrice } from "../../../application/use-cases/UpdateServicePrice";
 import { DeleteService } from "../../../application/use-cases/DeleteService";
 import { GetBackup } from "../../../application/use-cases/GetBackup";
+import { AnalyzeSheet } from "../../../application/use-cases/AnalyzeSheet";
 import { ServiceController } from "../../../interface/controllers/ServiceController";
+import { GeminiAnalyzerProvider } from "../../../infrastructure/providers/GeminiAnalyzerProvider";
+import { OpenAIAnalyzerProvider } from "../../../infrastructure/providers/OpenAIAnalyzerProvider";
 
 export const makeServiceController = (): ServiceController => {
   const clientRepository = new MongooseClientRepository();
@@ -19,12 +22,20 @@ export const makeServiceController = (): ServiceController => {
   const deleteService = new DeleteService(washRepository);
   const getBackup = new GetBackup(clientRepository, washRepository);
 
+  // Decisão do provedor de análise via variável de ambiente
+  const analyzerProvider = process.env.ANALYZE_PROVIDER === "openai"
+    ? new OpenAIAnalyzerProvider()
+    : new GeminiAnalyzerProvider();
+
+  const analyzeSheet = new AnalyzeSheet(analyzerProvider);
+
   return new ServiceController(
     registerService,
     listServices,
     updateServiceStatus,
     updateServicePrice,
     deleteService,
-    getBackup
+    getBackup,
+    analyzeSheet
   );
 };

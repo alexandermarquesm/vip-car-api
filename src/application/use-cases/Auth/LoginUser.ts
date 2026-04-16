@@ -38,6 +38,8 @@ export class LoginUser {
     }
 
     
+    const tokenExpiration = tenant.plan === "monthly" ? "30d" : "7d";
+
     const token = jwt.sign(
       {
         id: user.id,
@@ -45,7 +47,7 @@ export class LoginUser {
         role: user.role,
       },
       secret,
-      { expiresIn: "8h" }
+      { expiresIn: tokenExpiration }
     );
 
     return {

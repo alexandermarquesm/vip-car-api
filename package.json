@@ -20,6 +20,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/genai": "^1.50.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
@@ -28,6 +29,8 @@
     "jsonwebtoken": "^9.0.3",
     "migrate-mongo": "^14.0.7",
     "mongoose": "^9.1.6",
+    "multer": "^2.1.1",
+    "openai": "^6.34.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -35,6 +38,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.1.0",
     "@types/node": "^22.13.9",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.2"

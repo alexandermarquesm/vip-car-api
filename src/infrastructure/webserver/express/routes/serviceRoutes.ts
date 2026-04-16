@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { ServiceController } from "../../../../interface/controllers/ServiceController";
 import { subscriptionMiddleware } from "../middlewares/SubscriptionMiddleware";
+import { uploadMiddleware } from "../middlewares/UploadMiddleware";
 
 export const createServiceRoutes = (serviceController: ServiceController): Router => {
   const router = Router();
 
   router.use(subscriptionMiddleware);
 
+  router.post("/scan", uploadMiddleware.single("image"), (req, res) => serviceController.scanSheet(req as any, res));
   router.post("/", (req, res) => serviceController.register(req, res));
   router.get("/", (req, res) => serviceController.list(req, res));
   router.patch("/:id/status", (req, res) => serviceController.updateStatus(req, res));
