@@ -6,7 +6,7 @@ export const errorHandler = (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+): void => {
   console.error("❌ Error:", err.message);
 
   if (err instanceof z.ZodError) {

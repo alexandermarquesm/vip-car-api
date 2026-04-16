@@ -1,4 +1,4 @@
-import express, { Express } from "express";
+import express, { Express, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { createServiceRoutes } from "./routes/serviceRoutes";
@@ -27,7 +27,7 @@ export const createApp = (
   app.use(loggerMiddleware);
 
   // Health Check
-  app.get("/", (req, res) => {
+  app.get("/", (req: Request, res: Response) => {
     res.send("VIP CAR Backend (TypeScript + Clean Architecture) está rodando! 🚗💨");
   });
 
@@ -35,10 +35,9 @@ export const createApp = (
   app.use("/auth", createAuthRoutes(authController));
 
   // Domain Routes (Protected)
-  // Casting to any to bypass TS complaining about normal expressRequestHandler vs authMiddleware Custom Request
-  app.get("/backup", authMiddleware as any, (req, res) => serviceController.backup(req as any, res));
-  app.use("/services", authMiddleware as any, createServiceRoutes(serviceController));
-  app.use("/clients", authMiddleware as any, createClientRoutes(clientController));
+  app.get("/backup", authMiddleware, (req: Request, res: Response) => serviceController.backup(req as any, res));
+  app.use("/services", authMiddleware, createServiceRoutes(serviceController));
+  app.use("/clients", authMiddleware, createClientRoutes(clientController));
 
   // Error Handler (deve ser o último)
   app.use(errorHandler);

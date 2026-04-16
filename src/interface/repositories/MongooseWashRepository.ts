@@ -23,7 +23,7 @@ export class MongooseWashRepository implements IWashRepository {
         { _id: wash._id, tenantId: wash.tenantId },
         data,
         {
-          new: true,
+          returnDocument: "after",
           upsert: true,
         }
       );
@@ -51,7 +51,7 @@ export class MongooseWashRepository implements IWashRepository {
 
   async update(tenantId: string, id: string, updateData: Partial<Wash>): Promise<Wash | null> {
     const doc = await WashModel.findOneAndUpdate({ tenantId, _id: id }, updateData, {
-      new: true,
+      returnDocument: "after",
     });
     return doc ? this._mapToEntity(doc) : null;
   }

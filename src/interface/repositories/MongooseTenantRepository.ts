@@ -45,7 +45,7 @@ export class MongooseTenantRepository implements ITenantRepository {
         trialEndsAt: tenant.trialEndsAt,
         createdAt: tenant.createdAt,
       },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
     return tenant;
   }

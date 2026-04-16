@@ -16,7 +16,7 @@ export class MongooseClientRepository implements IClientRepository {
     const doc = await ClientModel.findOneAndUpdate(
       { tenantId: client.tenantId, _id: client.id },
       { $set: data },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: 'after' },
     );
 
     return this._mapToEntity(doc);
@@ -61,7 +61,7 @@ export class MongooseClientRepository implements IClientRepository {
     updateData: Partial<Client>,
   ): Promise<Client | null> {
     const doc = await ClientModel.findOneAndUpdate({ tenantId, _id: id }, updateData, {
-      new: true,
+      returnDocument: 'after',
     });
     return doc ? this._mapToEntity(doc) : null;
   }

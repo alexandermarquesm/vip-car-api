@@ -30,7 +30,7 @@ export class MongooseUserRepository implements IUserRepository {
         status: user.status,
         createdAt: user.createdAt,
       },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
     return user;
   }
