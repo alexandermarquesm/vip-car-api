@@ -4,10 +4,9 @@ import { IAnalyzerProvider } from "../../application/protocols/IAnalyzerProvider
 export class OpenAIAnalyzerProvider implements IAnalyzerProvider {
   private openai: OpenAI;
 
-  constructor() {
-    const apiKey = process.env.OPENAI_API_KEY;
+  constructor(apiKey: string) {
     if (!apiKey) {
-      throw new Error("OPENAI_API_KEY não configurada.");
+      throw new Error("OPENAI_API_KEY não fornecida para o provedor.");
     }
     this.openai = new OpenAI({ apiKey });
   }

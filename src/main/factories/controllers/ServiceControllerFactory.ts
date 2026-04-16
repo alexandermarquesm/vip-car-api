@@ -11,7 +11,7 @@ import { ServiceController } from "../../../interface/controllers/ServiceControl
 import { GeminiAnalyzerProvider } from "../../../infrastructure/providers/GeminiAnalyzerProvider";
 import { OpenAIAnalyzerProvider } from "../../../infrastructure/providers/OpenAIAnalyzerProvider";
 
-export const makeServiceController = (): ServiceController => {
+export const makeServiceController = (env: any): ServiceController => {
   const clientRepository = new MongooseClientRepository();
   const washRepository = new MongooseWashRepository();
 
@@ -23,9 +23,9 @@ export const makeServiceController = (): ServiceController => {
   const getBackup = new GetBackup(clientRepository, washRepository);
 
   // Decisão do provedor de análise via variável de ambiente
-  const analyzerProvider = process.env.ANALYZE_PROVIDER === "openai"
-    ? new OpenAIAnalyzerProvider()
-    : new GeminiAnalyzerProvider();
+  const analyzerProvider = env.ANALYZE_PROVIDER === "openai"
+    ? new OpenAIAnalyzerProvider(env.OPENAI_API_KEY)
+    : new GeminiAnalyzerProvider(env.GEMINI_API_KEY);
 
   const analyzeSheet = new AnalyzeSheet(analyzerProvider);
 

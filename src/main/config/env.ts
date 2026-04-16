@@ -7,6 +7,9 @@ const envSchema = z.object({
   PORT: z.string().transform(Number).default("3000"),
   MONGO_URI: z.string().url("MONGO_URI deve ser uma URL válida"),
   JWT_SECRET: z.string().min(32, "JWT_SECRET deve ter pelo menos 32 caracteres"),
+  GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY é obrigatória para análise de imagens"),
+  OPENAI_API_KEY: z.string().optional(),
+  ANALYZE_PROVIDER: z.enum(["gemini", "openai"]).default("gemini"),
 });
 
 export const loadEnv = () => {

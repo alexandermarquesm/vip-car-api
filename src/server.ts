@@ -26,7 +26,7 @@ const getApp = async () => {
   }
 
   // 3. Inicializar App via Factories (Composition Root)
-  const serviceController = makeServiceController();
+  const serviceController = makeServiceController(env);
   const clientController = makeClientController();
   const authController = makeAuthController(env.JWT_SECRET);
   

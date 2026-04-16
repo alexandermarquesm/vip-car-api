@@ -4,10 +4,9 @@ import { IAnalyzerProvider } from "../../application/protocols/IAnalyzerProvider
 export class GeminiAnalyzerProvider implements IAnalyzerProvider {
   private ai: GoogleGenAI;
 
-  constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
+  constructor(apiKey: string) {
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY não configurada.");
+      throw new Error("GEMINI_API_KEY não fornecida para o provedor.");
     }
     this.ai = new GoogleGenAI({ apiKey });
   }
