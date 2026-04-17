@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { RegisterTenant } from "../../application/use-cases/Auth/RegisterTenant";
 import { LoginUser } from "../../application/use-cases/Auth/LoginUser";
+import { AppError } from "../../infrastructure/errors/AppError";
 
 export class AuthController {
   constructor(
@@ -9,8 +10,9 @@ export class AuthController {
   ) {}
 
   async register(req: Request, res: Response): Promise<void> {
+    const { tenantName, document, userName, email, passwordRaw } = req.body;
+    
     try {
-      const { tenantName, document, userName, email, passwordRaw } = req.body;
       const result = await this.registerTenant.execute({
         tenantName,
         document,
@@ -21,10 +23,9 @@ export class AuthController {
       res.status(201).json(result);
     } catch (error: any) {
       if (error.message.includes("já está em uso")) {
-        res.status(409).json({ error: error.message });
-        return;
+        throw new AppError(error.message, 409);
       }
-      res.status(400).json({ error: error.message });
+      throw error;
     }
   }
 
@@ -35,10 +36,10 @@ export class AuthController {
       res.json(result);
     } catch (error: any) {
       if (error.message.includes("incorretos") || error.message.includes("inativo")) {
-        res.status(401).json({ error: error.message });
-        return;
+        throw new AppError(error.message, 401);
       }
-      res.status(500).json({ error: error.message });
+      throw error;
     }
   }
 }
+

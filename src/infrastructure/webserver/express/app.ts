@@ -10,6 +10,7 @@ import { AuthController } from "../../../interface/controllers/AuthController";
 import { errorHandler } from "./middlewares/ErrorHandler";
 import { createAuthMiddleware } from "./middlewares/AuthMiddleware";
 import { loggerMiddleware } from "./middlewares/LoggerMiddleware";
+import { asyncHandler } from "./utils/AsyncHandler";
 
 export const createApp = (
   serviceController: ServiceController,
@@ -35,12 +36,13 @@ export const createApp = (
   app.use("/auth", createAuthRoutes(authController));
 
   // Domain Routes (Protected)
-  app.get("/backup", authMiddleware, (req: Request, res: Response) => serviceController.backup(req as any, res));
+  app.get("/backup", authMiddleware, asyncHandler((req: any, res: any) => serviceController.backup(req, res)));
   app.use("/services", authMiddleware, createServiceRoutes(serviceController));
   app.use("/clients", authMiddleware, createClientRoutes(clientController));
 
   // Error Handler (deve ser o último)
   app.use(errorHandler);
+
 
   return app;
 };

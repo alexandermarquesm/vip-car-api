@@ -10,10 +10,10 @@ import crypto from "crypto";
 export interface RegisterServiceInput {
   tenantId: string;
   name: string;
-  phone: string;
-  plate: string;
+  phone: string; // Já vem limpo (apenas dígitos) pela validação Zod
+  plate: string; // Já vem limpo (UpperCase, sem símbolos) pela validação Zod
   carModel: string;
-  washPrice: string | number;
+  washPrice: number; // Agora é obrigatoriamente um number
   deliveryTime: string | Date;
   paymentMethod?: string;
 }
@@ -25,19 +25,8 @@ export class RegisterService {
   ) {}
 
   async execute(input: RegisterServiceInput) {
-    // Validate and sanitize input via Zod
-    // Note: for partial inputs or slightly different shapes, we can use specific schemas
-    // but here we'll use the core WashSchema rules.
-    const sanitizedPlate = input.plate ? input.plate.trim().toUpperCase() : "";
-    const sanitizedPhone = input.phone ? input.phone.replace(/\D/g, "") : "";
-
-    // 1. Validations via Schema (Manual parse for specific fields if needed)
-    // Plate regex is already in schema
+    const sanitizedPlate = input.plate.toUpperCase();
     
-    if (input.carModel && input.carModel.length > 30) {
-      throw new Error("O modelo do carro deve ter no máximo 30 caracteres.");
-    }
-
     // Check for duplicate pending wash
     const existingWash = await this.washRepository.findPendingByPlate(input.tenantId, sanitizedPlate);
     if (existingWash) {
@@ -47,37 +36,31 @@ export class RegisterService {
     }
 
     // 2. Find or Create Client
-    let client = null;
-    if (sanitizedPhone) {
-      client = await this.clientRepository.findByPhone(input.tenantId, sanitizedPhone);
-    }
+    let client = await this.clientRepository.findByPhone(input.tenantId, input.phone);
 
     if (client) {
       client.name = input.name;
-      if (input.plate) {
-        client.addVehicle(sanitizedPlate, input.carModel);
-      }
+      client.addVehicle(sanitizedPlate, input.carModel);
       await this.clientRepository.save(client);
     } else {
       const newClient = new Client({
         tenantId: input.tenantId,
         name: input.name,
-        phone: sanitizedPhone,
-        vehicles: input.plate ? [{ plate: sanitizedPlate, carModel: input.carModel }] : [],
+        phone: input.phone,
+        vehicles: [{ plate: sanitizedPlate, carModel: input.carModel }],
       });
       client = await this.clientRepository.save(newClient);
     }
 
     // 3. Create Wash Record
-    const numericPrice = this._parsePrice(input.washPrice);
-    const netPrice = PriceCalculator.calculateNetPrice(numericPrice, input.paymentMethod);
+    const netPrice = PriceCalculator.calculateNetPrice(input.washPrice, input.paymentMethod);
 
     const wash = new Wash({
       tenantId: input.tenantId,
       clientId: client.id,
       plate: sanitizedPlate,
       carModel: input.carModel,
-      price: numericPrice,
+      price: input.washPrice,
       netPrice,
       deliveryTime: new Date(input.deliveryTime),
       paymentMethod: input.paymentMethod,
@@ -87,7 +70,7 @@ export class RegisterService {
     // Final security check before saving
     WashSchema.parse({
       ...wash,
-      deliveryTime: wash.deliveryTime.toISOString() // Zod expects string or Date depending on schema
+      deliveryTime: wash.deliveryTime.toISOString()
     });
 
     const savedWash = await this.washRepository.save(wash);
@@ -98,13 +81,5 @@ export class RegisterService {
       wash: savedWash,
     };
   }
-
-  private _parsePrice(price: string | number): number {
-    if (typeof price === "number") return price;
-    if (!price) return 0;
-    
-    return parseFloat(
-      price.replace("R$", "").replace(".", "").replace(",", ".")
-    ) || 0;
-  }
 }
+

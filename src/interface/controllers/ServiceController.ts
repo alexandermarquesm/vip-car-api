@@ -7,8 +7,7 @@ import { UpdateServicePrice } from "../../application/use-cases/UpdateServicePri
 import { DeleteService } from "../../application/use-cases/DeleteService";
 import { GetBackup } from "../../application/use-cases/GetBackup";
 import { AnalyzeSheet } from "../../application/use-cases/AnalyzeSheet";
-import { WashSchema, PaymentSchema } from "../../domain/schemas/WashSchema";
-import { z } from "zod";
+import { AppError } from "../../infrastructure/errors/AppError";
 
 export class ServiceController {
   constructor(
@@ -23,8 +22,6 @@ export class ServiceController {
 
   async register(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      // Input Validation with Zod (Optional layer, but good to have)
-      // Note: RegisterService might do its own validation or trust the controller
       const result = await this.registerService.execute({
         tenantId: req.user!.tenantId,
         ...req.body,
@@ -32,107 +29,76 @@ export class ServiceController {
       res.status(201).json(result);
     } catch (error: any) {
       if (error.message.includes("já possui uma lavagem pendente")) {
-        res.status(409).json({ error: error.message });
-        return;
+        throw new AppError(error.message, 409);
       }
-      res.status(400).json({ error: error.message });
+      throw error;
     }
   }
 
   async list(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const { status, date, q } = req.query;
-      const services = await this.listServices.execute({ 
-        tenantId: req.user!.tenantId,
-        status: status as string, 
-        date: date as string,
-        search: q as string
-      });
-      res.json(services);
-    } catch (error: any) {
-      console.error("Error in ServiceController.list:", error);
-      res.status(500).json({ error: error.message, stack: error.stack });
-    }
+    const { status, date, q } = req.query;
+    const services = await this.listServices.execute({ 
+      tenantId: req.user!.tenantId,
+      status: status as string, 
+      date: date as string,
+      search: q as string
+    });
+    res.json(services);
   }
 
   async updateStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const { id } = req.params;
+    const { status, paymentMethod, payments } = req.body;
+    
     try {
-      const { id } = req.params;
-      const { status, paymentMethod, payments } = req.body;
-      
-      // Validation
-      const validatedStatus = z.enum(["pending", "completed", "cancelled"]).parse(status);
-      
       const wash = await this.updateServiceStatus.execute({
         tenantId: req.user!.tenantId,
         id: id as string,
-        status: validatedStatus,
+        status,
         paymentMethod,
         payments,
       });
       res.json(wash);
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Dados inválidos", details: error.errors });
-        return;
-      }
       if (error.message.includes("já possui uma lavagem pendente")) {
-        res.status(409).json({ error: error.message });
-        return;
+        throw new AppError(error.message, 409);
       }
-      res.status(500).json({ error: error.message });
+      throw error;
     }
   }
 
   async updatePrice(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      const { price } = req.body;
-      const wash = await this.updateServicePrice.execute({ 
-        tenantId: req.user!.tenantId, 
-        id: id as string, 
-        price: Number(price) 
-      });
-      res.json(wash);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+    const { id } = req.params;
+    const { price } = req.body;
+    const wash = await this.updateServicePrice.execute({ 
+      tenantId: req.user!.tenantId, 
+      id: id as string, 
+      price: Number(price) 
+    });
+    res.json(wash);
   }
 
   async backup(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const backupData = await this.getBackup.execute(req.user!.tenantId);
-      res.json(backupData);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+    const backupData = await this.getBackup.execute(req.user!.tenantId);
+    res.json(backupData);
   }
 
   async delete(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      await this.deleteService.execute({ 
-        tenantId: req.user!.tenantId, 
-        id: id as string 
-      });
-      res.status(204).send();
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+    const { id } = req.params;
+    await this.deleteService.execute({ 
+      tenantId: req.user!.tenantId, 
+      id: id as string 
+    });
+    res.status(204).send();
   }
 
   async scanSheet(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      if (!req.file) {
-        res.status(400).json({ error: "Nenhuma imagem providenciada" });
-        return;
-      }
-
-      const rows = await this.analyzeSheet.execute(req.file.buffer, req.file.mimetype);
-      res.json(rows);
-    } catch (error: any) {
-      console.error("Erro ao escanear planilha:", error);
-      res.status(500).json({ error: error.message || "Erro interno ao processar a imagem." });
+    if (!req.file) {
+      throw new AppError("Nenhuma imagem providenciada", 400);
     }
+
+    const rows = await this.analyzeSheet.execute(req.file.buffer, req.file.mimetype);
+    res.json(rows);
   }
 }
+
