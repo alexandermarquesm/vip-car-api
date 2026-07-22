@@ -19,6 +19,8 @@ const envSchema = z.object({
   STRIPE_PRICE_ID_BASIC_EUR: z.string().optional(),
   STRIPE_PRICE_ID_PRO_EUR: z.string().optional(),
   CORS_ALLOWED_ORIGINS: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 export const loadEnv = () => {

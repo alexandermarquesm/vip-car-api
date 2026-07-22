@@ -3,6 +3,8 @@ import { IEmailService } from "../../application/protocols/IEmailService";
 
 export class ResendEmailService implements IEmailService {
   private resend: Resend | null = null;
+  private readonly isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+  private readonly from = process.env.EMAIL_FROM || "VIP CAR <onboarding@resend.dev>";
 
   constructor() {
     const apiKey = process.env.RESEND_API_KEY;
@@ -18,7 +20,7 @@ export class ResendEmailService implements IEmailService {
     if (this.resend) {
       try {
         const { error } = await this.resend.emails.send({
-          from: "VIP CAR <onboarding@resend.dev>",
+          from: this.from,
           to: [email],
           subject: "VIP CAR - Confirme seu E-mail",
           html: `
@@ -37,13 +39,16 @@ export class ResendEmailService implements IEmailService {
           `,
         });
 
-        if (!error) {
-          return;
-        }
-        console.error(`\x1b[31mErro retornado pelo Resend:\x1b[0m ${error.message}`);
+        if (!error) return;
+        throw new Error(`Falha ao enviar e-mail de confirmação: ${error.message}`);
       } catch (err: any) {
+        if (this.isProduction) throw err;
         console.error(`\x1b[31mFalha ao conectar à API do Resend:\x1b[0m ${err.message}`);
       }
+    }
+
+    if (this.isProduction) {
+      throw new Error("Serviço de e-mail não configurado em produção.");
     }
 
     // Elegant fallback: print to console so the app never breaks for developers!
@@ -60,7 +65,7 @@ export class ResendEmailService implements IEmailService {
     if (this.resend) {
       try {
         const { error } = await this.resend.emails.send({
-          from: "VIP CAR <onboarding@resend.dev>",
+          from: this.from,
           to: [email],
           subject: "VIP CAR - Recuperação de Senha",
           html: `
@@ -79,13 +84,16 @@ export class ResendEmailService implements IEmailService {
           `,
         });
 
-        if (!error) {
-          return;
-        }
-        console.error(`\x1b[31mErro retornado pelo Resend:\x1b[0m ${error.message}`);
+        if (!error) return;
+        throw new Error(`Falha ao enviar e-mail de recuperação: ${error.message}`);
       } catch (err: any) {
+        if (this.isProduction) throw err;
         console.error(`\x1b[31mFalha ao conectar à API do Resend:\x1b[0m ${err.message}`);
       }
+    }
+
+    if (this.isProduction) {
+      throw new Error("Serviço de e-mail não configurado em produção.");
     }
 
     // Fallback console print
