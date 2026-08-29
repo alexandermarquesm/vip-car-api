@@ -16,20 +16,13 @@ export class SubscriptionController {
     }
 
     const plan = req.body?.plan === "pro" ? "pro" : "basic";
-    const currency = req.body?.currency;
     const redirectUrl = req.body?.redirectUrl;
-
-    const host = req.get("host");
-    const protocol = req.protocol;
-    const apiBaseUrl = `${protocol}://${host}`;
 
     try {
       const { checkoutUrl } = await this.createCheckout.execute({
         tenantId: req.user.tenantId,
         plan,
-        currency,
         redirectUrl,
-        apiBaseUrl,
       });
 
       res.status(200).json({ url: checkoutUrl });

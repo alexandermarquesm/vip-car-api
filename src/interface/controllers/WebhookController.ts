@@ -98,6 +98,7 @@ export class WebhookController {
       }
 
       await WebhookEventModel.create({ eventId: event.id });
+      res.status(200).send("OK");
     } catch (error: any) {
       console.error(`[Webhook Stripe] Erro ao processar evento: ${error.message}`);
       res.status(500).json({ error: "Erro ao processar evento" });

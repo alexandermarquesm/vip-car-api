@@ -4,9 +4,7 @@ import { loadEnv } from "../../../main/config/env";
 interface CreateCheckoutRequest {
   tenantId: string;
   plan: "basic" | "pro";
-  currency?: string; // "BRL" | "USD" | "EUR"
   redirectUrl?: string;
-  apiBaseUrl: string;
 }
 
 interface CreateCheckoutResponse {
@@ -15,16 +13,13 @@ interface CreateCheckoutResponse {
 
 export class CreateCheckout {
   async execute(request: CreateCheckoutRequest): Promise<CreateCheckoutResponse> {
-    const { tenantId, plan, currency, redirectUrl, apiBaseUrl } = request;
+    const { tenantId, plan, redirectUrl } = request;
     const env = loadEnv();
 
     const secretKey = env.STRIPE_SECRET_KEY;
-    const priceIdBasicBRL = env.STRIPE_PRICE_ID_BASIC;
-    const priceIdProBRL = env.STRIPE_PRICE_ID_PRO;
-    const priceIdBasicUSD = env.STRIPE_PRICE_ID_BASIC_USD;
-    const priceIdProUSD = env.STRIPE_PRICE_ID_PRO_USD;
-    const priceIdBasicEUR = env.STRIPE_PRICE_ID_BASIC_EUR;
-    const priceIdProEUR = env.STRIPE_PRICE_ID_PRO_EUR;
+    const priceId = plan === "pro"
+      ? env.STRIPE_PRICE_ID_PRO
+      : env.STRIPE_PRICE_ID_BASIC;
 
     if (!secretKey) {
       console.error("[CreateCheckout] ERRO: STRIPE_SECRET_KEY não configurada.");
@@ -33,22 +28,8 @@ export class CreateCheckout {
 
     const stripe = new Stripe(secretKey);
 
-    let priceId = "";
-    const requestedCurrency = (currency || "BRL").toUpperCase();
-
-    if (requestedCurrency === "USD") {
-      priceId = plan === "pro" ? (priceIdProUSD || "") : (priceIdBasicUSD || "");
-    } else if (requestedCurrency === "EUR") {
-      priceId = plan === "pro" ? (priceIdProEUR || "") : (priceIdBasicEUR || "");
-    }
-
-    // Fallback para BRL
     if (!priceId) {
-      priceId = plan === "pro" ? (priceIdProBRL || "") : (priceIdBasicBRL || "");
-    }
-
-    if (!priceId) {
-      console.error(`[CreateCheckout] ERRO: Não foi possível determinar o Price ID para o plano ${plan} (${requestedCurrency}).`);
+      console.error(`[CreateCheckout] ERRO: Price ID não configurado para o plano ${plan}.`);
       throw new Error("Configuração de pagamento incompleta no servidor.");
     }
 
@@ -78,6 +59,8 @@ export class CreateCheckout {
             quantity: 1,
           },
         ],
+        // O Price possui opções BRL/USD/EUR. O Stripe Checkout escolhe a
+        // moeda compatível com a localização do cliente automaticamente.
         success_url: finalSuccessUrl,
         cancel_url: finalCancelUrl,
         // Passamos o tenantId e o plano nos metadados para o webhook
