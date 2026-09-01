@@ -63,7 +63,7 @@ export class AuthController {
       tokenHash,
       status: "pending",
       expiresAt: { $gt: new Date() },
-    }).select("tenantName expiresAt");
+    }).select("tenantId tenantName expiresAt");
 
     if (!invite) {
       throw new AppError("Convite inválido, expirado ou já utilizado.", 404);
