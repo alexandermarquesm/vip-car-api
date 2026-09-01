@@ -48,12 +48,34 @@ export class TeamController {
       );
     }
 
-    // Um único link por empresa reduz o risco de convites esquecidos. Gerar
-    // um novo link revoga imediatamente qualquer link anterior ainda ativo.
+    // Convites expirados deixam de reservar vagas. Links ainda válidos são
+    // mantidos: o proprietário pode compartilhar mais de um sem invalidar
+    // silenciosamente um link que já tenha sido enviado.
     await InviteModel.updateMany(
-      { tenantId, tokenHash: { $exists: true }, status: "pending" },
+      {
+        tenantId,
+        tokenHash: { $exists: true },
+        status: "pending",
+        expiresAt: { $lte: new Date() },
+      },
       { $set: { status: "revoked" } },
     );
+
+    const pendingInviteCount = await InviteModel.countDocuments({
+      tenantId,
+      status: "pending",
+      $or: [
+        { expiresAt: { $exists: false } },
+        { expiresAt: { $gt: new Date() } },
+      ],
+    });
+
+    if (pendingInviteCount >= availableSlots) {
+      throw new AppError(
+        "Já existe um convite ativo para cada vaga disponível. Use ou revogue um convite antes de gerar outro.",
+        409,
+      );
+    }
 
     const rawToken = crypto.randomBytes(32).toString("base64url");
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
