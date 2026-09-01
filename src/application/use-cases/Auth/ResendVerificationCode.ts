@@ -1,5 +1,6 @@
 import { IUserRepository } from "../../repositories/IUserRepository";
 import { IEmailService } from "../../protocols/IEmailService";
+import crypto from "crypto";
 
 export interface ResendVerificationCodeInput {
   email: string;
@@ -24,7 +25,7 @@ export class ResendVerificationCode {
     }
 
     // Generate new OTP
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const newCode = crypto.randomInt(100000, 1000000).toString();
     user.emailVerificationCode = newCode;
     user.emailVerificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
 

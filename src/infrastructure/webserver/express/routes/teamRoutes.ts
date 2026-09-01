@@ -7,6 +7,18 @@ export const createTeamRoutes = (teamController: TeamController): Router => {
   const router = Router();
 
   router.post(
+    "/invite-link",
+    requireRole(["owner"]),
+    asyncHandler((req: any, res: any) => teamController.createInviteLink(req, res))
+  );
+
+  router.delete(
+    "/invite-link/:id",
+    requireRole(["owner"]),
+    asyncHandler((req: any, res: any) => teamController.revokeInviteLink(req, res))
+  );
+
+  router.post(
     "/invite",
     requireRole(["owner"]),
     asyncHandler((req: any, res: any) => teamController.inviteMember(req, res))

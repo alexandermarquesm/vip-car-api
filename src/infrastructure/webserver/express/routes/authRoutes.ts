@@ -23,6 +23,12 @@ export const createAuthRoutes = (authController: AuthController, authMiddleware:
   );
 
   router.post(
+    "/invite/validate",
+    authLimiter,
+    asyncHandler((req: any, res: any) => authController.validateInvite(req, res))
+  );
+
+  router.post(
     "/login", 
     authLimiter,
     validate(LoginUserSchema), 
@@ -31,11 +37,13 @@ export const createAuthRoutes = (authController: AuthController, authMiddleware:
 
   router.post(
     "/verify-email",
+    authLimiter,
     asyncHandler((req: any, res: any) => authController.verifyEmail(req, res))
   );
 
   router.post(
     "/resend-code",
+    authLimiter,
     asyncHandler((req: any, res: any) => authController.resendCode(req, res))
   );
 
@@ -74,4 +82,3 @@ export const createAuthRoutes = (authController: AuthController, authMiddleware:
 
   return router;
 }
-

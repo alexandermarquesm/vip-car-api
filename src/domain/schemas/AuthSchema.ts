@@ -9,13 +9,19 @@ export const RegisterUserSchema = z.object({
     document: z.string().optional(),
     role: z.enum(["owner", "worker"]).optional().default("owner"),
     inviteCode: z.string().optional(),
+    inviteToken: z.string()
+      .min(32, "Token de convite inválido")
+      .max(128, "Token de convite inválido")
+      .regex(/^[A-Za-z0-9_-]+$/, "Token de convite inválido")
+      .optional(),
   }).refine((data) => {
     if (data.role === "worker") {
-      return !!data.inviteCode && data.inviteCode.trim().length > 0;
+      return (!!data.inviteToken && data.inviteToken.trim().length > 0) ||
+        (!!data.inviteCode && data.inviteCode.trim().length > 0);
     }
     return !!data.tenantName && data.tenantName.trim().length > 0;
   }, {
-    message: "Código de convite é obrigatório para colaboradores, e Nome da Empresa é obrigatório para proprietários.",
+    message: "Convite é obrigatório para colaboradores, e Nome da Empresa é obrigatório para proprietários.",
     path: ["inviteCode"],
   }),
 });
@@ -53,5 +59,4 @@ export type LoginUserInput = z.infer<typeof LoginUserSchema>["body"];
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>["body"];
 export type VerifyResetCodeInput = z.infer<typeof VerifyResetCodeSchema>["body"];
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>["body"];
-
 

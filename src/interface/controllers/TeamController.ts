@@ -10,6 +10,95 @@ import crypto from "crypto";
 export class TeamController {
   constructor(private userRepository: IUserRepository) {}
 
+  async createInviteLink(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const tenantId = req.user!.tenantId;
+    const tenant = await TenantModel.findById(tenantId);
+    if (!tenant) {
+      throw new AppError("Empresa não encontrada", 404);
+    }
+
+    const tenantEntity = new Tenant({
+      id: tenant.id,
+      name: tenant.name,
+      document: tenant.document,
+      status: tenant.status as any,
+      plan: tenant.plan as any,
+      subscriptionStatus: tenant.subscriptionStatus as any,
+      trialEndsAt: tenant.trialEndsAt,
+      createdAt: tenant.createdAt,
+      externalCustomerId: tenant.externalCustomerId,
+      externalSubscriptionId: tenant.externalSubscriptionId,
+      variantId: tenant.variantId,
+      currentPeriodEnd: tenant.currentPeriodEnd,
+      creditCardFee: tenant.creditCardFee,
+      debitCardFee: tenant.debitCardFee,
+      inviteCode: tenant.inviteCode,
+    });
+
+    const members = await this.userRepository.findAllByTenantId(tenantId);
+    const activeCount = members.filter(member =>
+      member.status === "active" || member.status === "inactive"
+    ).length;
+    const availableSlots = tenantEntity.getMaxUsers() - activeCount;
+
+    if (availableSlots <= 0) {
+      throw new AppError(
+        `Limite de usuários atingido para o seu plano (${tenantEntity.getMaxUsers()} usuário(s)).`,
+        403,
+      );
+    }
+
+    // Um único link por empresa reduz o risco de convites esquecidos. Gerar
+    // um novo link revoga imediatamente qualquer link anterior ainda ativo.
+    await InviteModel.updateMany(
+      { tenantId, tokenHash: { $exists: true }, status: "pending" },
+      { $set: { status: "revoked" } },
+    );
+
+    const rawToken = crypto.randomBytes(32).toString("base64url");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const invite = await InviteModel.create({
+      tenantId,
+      tenantName: tenant.name,
+      tokenHash,
+      expiresAt,
+      createdBy: req.user!.id,
+      status: "pending",
+    });
+
+    // O fragmento não é enviado ao servidor web e evita que o token apareça
+    // em logs HTTP. O token bruto nunca é salvo no banco de dados.
+    const inviteUrl = `https://vipercar.com.br/convite#${rawToken}`;
+
+    res.set("Cache-Control", "no-store");
+    res.status(201).json({
+      id: invite.id,
+      inviteUrl,
+      expiresAt,
+    });
+  }
+
+  async revokeInviteLink(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const invite = await InviteModel.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        tenantId: req.user!.tenantId,
+        tokenHash: { $exists: true },
+        status: "pending",
+      },
+      { $set: { status: "revoked" } },
+      { new: true },
+    ).catch(() => null);
+
+    if (!invite) {
+      throw new AppError("Convite não encontrado ou já utilizado.", 404);
+    }
+
+    res.status(204).send();
+  }
+
   async inviteMember(req: AuthenticatedRequest, res: Response): Promise<void> {
     const { email } = req.body;
     const tenantId = req.user!.tenantId;
@@ -107,7 +196,12 @@ export class TeamController {
       }));
 
     // Pega os convites pendentes que o dono enviou
-    const pendingInvites = await InviteModel.find({ tenantId, status: "pending" });
+    await InviteModel.updateMany(
+      { tenantId, status: "pending", expiresAt: { $lte: new Date() } },
+      { $set: { status: "revoked" } },
+    );
+    const pendingInvites = await InviteModel.find({ tenantId, status: "pending" })
+      .select("email tenantId tenantName status expiresAt createdAt");
 
     // Busca o Tenant para pegar o código de convite
     const tenant = await TenantModel.findById(tenantId);

@@ -47,6 +47,16 @@ export class CreateCustomerPortal {
       return { portalUrl: session.url };
     } catch (error: any) {
       console.error("[CreateCustomerPortal] Exceção:", error.message);
+
+      // Clientes criados no ambiente de testes da Stripe não existem no
+      // ambiente ativo (e vice-versa). Não exponha a mensagem técnica nem o
+      // identificador do cliente ao aplicativo.
+      if (error?.code === "resource_missing" && error?.param === "customer") {
+        throw new Error(
+          "Esta conta possui uma assinatura criada no ambiente de teste. O gerenciamento ficará disponível após uma assinatura ativa ser criada na versão de produção.",
+        );
+      }
+
       throw error;
     }
   }

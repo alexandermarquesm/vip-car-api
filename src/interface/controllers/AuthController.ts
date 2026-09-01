@@ -9,6 +9,9 @@ import { VerifyPasswordResetCode } from "../../application/use-cases/Auth/Verify
 import { ResetPassword } from "../../application/use-cases/Auth/ResetPassword";
 import { AppError } from "../../infrastructure/errors/AppError";
 import { ITenantRepository } from "../../application/repositories/ITenantRepository";
+import InviteModel from "../../infrastructure/database/mongoose-models/InviteModel";
+import TenantModel from "../../infrastructure/database/mongoose-models/TenantModel";
+import crypto from "crypto";
 
 export class AuthController {
   constructor(
@@ -24,7 +27,7 @@ export class AuthController {
   ) {}
 
   async register(req: Request, res: Response): Promise<void> {
-    const { tenantName, document, userName, email, passwordRaw, role, inviteCode } = req.body;
+    const { tenantName, document, userName, email, passwordRaw, role, inviteCode, inviteToken } = req.body;
     
     try {
       const result = await this.registerTenant.execute({
@@ -35,6 +38,7 @@ export class AuthController {
         passwordRaw,
         role,
         inviteCode,
+        inviteToken,
       });
       res.status(201).json(result);
     } catch (error: any) {
@@ -43,6 +47,46 @@ export class AuthController {
       }
       throw error;
     }
+  }
+
+  async validateInvite(req: Request, res: Response): Promise<void> {
+    const inviteToken = typeof req.body?.inviteToken === "string"
+      ? req.body.inviteToken.trim()
+      : "";
+
+    if (!/^[A-Za-z0-9_-]{32,128}$/.test(inviteToken)) {
+      throw new AppError("Convite inválido ou expirado.", 400);
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(inviteToken).digest("hex");
+    const invite = await InviteModel.findOne({
+      tokenHash,
+      status: "pending",
+      expiresAt: { $gt: new Date() },
+    }).select("tenantName expiresAt");
+
+    if (!invite) {
+      throw new AppError("Convite inválido, expirado ou já utilizado.", 404);
+    }
+
+    const tenant = await TenantModel.findById(invite.tenantId)
+      .select("status plan subscriptionStatus trialEndsAt currentPeriodEnd");
+    const now = new Date();
+    const isTrialExpired = tenant?.plan === "trial" && tenant.trialEndsAt < now;
+    const isSubscriptionInactive =
+      tenant?.plan === "monthly" &&
+      tenant.subscriptionStatus !== "active" &&
+      (!tenant.currentPeriodEnd || tenant.currentPeriodEnd < now);
+
+    if (!tenant || tenant.status !== "active" || isTrialExpired || isSubscriptionInactive) {
+      throw new AppError("A empresa deste convite não está disponível no momento.", 403);
+    }
+
+    res.json({
+      valid: true,
+      tenantName: invite.tenantName,
+      expiresAt: invite.expiresAt,
+    });
   }
 
   async login(req: Request, res: Response): Promise<void> {
@@ -184,4 +228,3 @@ export class AuthController {
     }
   }
 }
-
