@@ -25,6 +25,7 @@ export class ConfirmPayment {
     tenant.subscriptionStatus = (status as any) || "active";
     tenant.externalCustomerId = externalCustomerId;
     tenant.externalSubscriptionId = externalSubscriptionId;
+    tenant.billingProvider = "stripe";
     tenant.variantId = variantId;
     
     if (currentPeriodEnd) {

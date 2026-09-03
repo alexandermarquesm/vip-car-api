@@ -28,6 +28,10 @@ export class CreateCustomerPortal {
       throw new Error("Tenant não encontrado.");
     }
 
+    if (tenant.billingProvider && tenant.billingProvider !== "stripe") {
+      throw new Error("Esta assinatura não é administrada pela Stripe.");
+    }
+
     if (!tenant.externalCustomerId) {
       throw new Error("Você possui uma assinatura ativa manualmente (ou de cortesia) que não está vinculada ao Stripe.");
     }
@@ -37,7 +41,7 @@ export class CreateCustomerPortal {
     try {
       const session = await stripe.billingPortal.sessions.create({
         customer: tenant.externalCustomerId,
-        return_url: "vipercar://success", // Redireciona de volta para o app
+        return_url: env.WEBSITE_URL,
       });
 
       if (!session.url) {

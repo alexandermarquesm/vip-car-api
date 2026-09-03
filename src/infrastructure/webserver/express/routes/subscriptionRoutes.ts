@@ -7,6 +7,7 @@ export const createSubscriptionRoutes = (subscriptionController: SubscriptionCon
 
   router.post("/checkout", asyncHandler((req: any, res: any) => subscriptionController.checkout(req, res)));
   router.post("/portal", asyncHandler((req: any, res: any) => subscriptionController.portal(req, res)));
+  router.post("/google-play/verify", asyncHandler((req: any, res: any) => subscriptionController.verifyGooglePlayPurchase(req, res)));
 
   return router;
 };

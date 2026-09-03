@@ -4,7 +4,6 @@ import { loadEnv } from "../../../main/config/env";
 interface CreateCheckoutRequest {
   tenantId: string;
   plan: "basic" | "pro";
-  redirectUrl?: string;
 }
 
 interface CreateCheckoutResponse {
@@ -13,7 +12,7 @@ interface CreateCheckoutResponse {
 
 export class CreateCheckout {
   async execute(request: CreateCheckoutRequest): Promise<CreateCheckoutResponse> {
-    const { tenantId, plan, redirectUrl } = request;
+    const { tenantId, plan } = request;
     const env = loadEnv();
 
     const secretKey = env.STRIPE_SECRET_KEY;
@@ -34,21 +33,7 @@ export class CreateCheckout {
     }
 
     try {
-      let finalSuccessUrl = "vipercar://success";
-      let finalCancelUrl = "vipercar://cancel";
-
-      if (redirectUrl) {
-        const isDev = env.NODE_ENV !== "production";
-        const isValidAppScheme = redirectUrl.startsWith("vipercar://");
-        const isValidExpoScheme = isDev && (redirectUrl.startsWith("exp://") || redirectUrl.startsWith("http://localhost") || redirectUrl.startsWith("http://192.168."));
-
-        if (isValidAppScheme || isValidExpoScheme) {
-          finalSuccessUrl = redirectUrl;
-          finalCancelUrl = redirectUrl.replace("success", "cancel");
-        } else {
-          console.warn(`[CreateCheckout] URL de redirecionamento rejeitada por segurança: ${redirectUrl}`);
-        }
-      }
+      const websiteUrl = env.WEBSITE_URL.replace(/\/$/, "");
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
@@ -61,8 +46,8 @@ export class CreateCheckout {
         ],
         // O Price possui opções BRL/USD/EUR. O Stripe Checkout escolhe a
         // moeda compatível com a localização do cliente automaticamente.
-        success_url: finalSuccessUrl,
-        cancel_url: finalCancelUrl,
+        success_url: `${websiteUrl}/?payment=success`,
+        cancel_url: `${websiteUrl}/?payment=cancelled`,
         // Passamos o tenantId e o plano nos metadados para o webhook
         metadata: {
           tenantId,

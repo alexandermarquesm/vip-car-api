@@ -105,6 +105,12 @@ export const createApp = (
   app.use(express.json());
   app.use(loggerMiddleware);
 
+  // Google Play RTDN — o token OIDC do Pub/Sub é validado pelo controller.
+  app.post(
+    "/webhooks/google-play",
+    asyncHandler((req: Request, res: Response) => webhookController.handleGooglePlay(req, res)),
+  );
+
   // Health Check
   app.get("/", (req: Request, res: Response) => {
     res.send("VIPER CAR Backend (TypeScript + Clean Architecture) está rodando! 🚗💨");
@@ -198,12 +204,6 @@ export const createApp = (
   app.use("/team", authMiddleware, activeUserMiddleware, subscriptionMiddleware, createTeamRoutes(teamController));
   app.use("/expenses", authMiddleware, activeUserMiddleware, subscriptionMiddleware, planLimitMiddleware("expenses"), createExpenseRoutes(expenseController));
   
-  // Public subscription success page (Stripe redirect)
-  app.get(
-    "/subscriptions/success",
-    asyncHandler((req: Request, res: Response) => subscriptionController.successPage(req, res))
-  );
-
   // Subscription Routes (Protected, but does NOT require active subscription obviously)
   app.use("/subscriptions", authMiddleware, createSubscriptionRoutes(subscriptionController));
 

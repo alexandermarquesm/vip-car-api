@@ -11,6 +11,11 @@ export interface ITenantDocument extends Document<string> {
   createdAt: Date;
   externalCustomerId?: string;
   externalSubscriptionId?: string;
+  billingProvider?: "stripe" | "google_play" | "courtesy";
+  googlePlayPurchaseTokenHash?: string;
+  googlePlayObfuscatedAccountId?: string;
+  googlePlayProductId?: string;
+  googlePlayLatestOrderId?: string;
   variantId?: string;
   currentPeriodEnd?: Date;
   creditCardFee: number;
@@ -29,6 +34,11 @@ const tenantSchema = new Schema<ITenantDocument>({
   createdAt: { type: Date, default: Date.now },
   externalCustomerId: { type: String, index: { sparse: true } },
   externalSubscriptionId: { type: String, index: { sparse: true } },
+  billingProvider: { type: String, enum: ["stripe", "google_play", "courtesy"] },
+  googlePlayPurchaseTokenHash: { type: String, unique: true, sparse: true, index: true },
+  googlePlayObfuscatedAccountId: { type: String, unique: true, sparse: true, index: true },
+  googlePlayProductId: { type: String },
+  googlePlayLatestOrderId: { type: String },
   variantId: { type: String },
   currentPeriodEnd: { type: Date },
   creditCardFee: { type: Number, default: 3.09 },

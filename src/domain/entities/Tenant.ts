@@ -11,6 +11,11 @@ export interface ITenantProps {
   createdAt?: Date;
   externalCustomerId?: string;
   externalSubscriptionId?: string;
+  billingProvider?: "stripe" | "google_play" | "courtesy";
+  googlePlayPurchaseTokenHash?: string;
+  googlePlayObfuscatedAccountId?: string;
+  googlePlayProductId?: string;
+  googlePlayLatestOrderId?: string;
   variantId?: string;
   currentPeriodEnd?: Date;
   creditCardFee?: number;
@@ -29,6 +34,11 @@ export class Tenant {
   public readonly createdAt: Date;
   public externalCustomerId?: string;
   public externalSubscriptionId?: string;
+  public billingProvider?: "stripe" | "google_play" | "courtesy";
+  public googlePlayPurchaseTokenHash?: string;
+  public googlePlayObfuscatedAccountId?: string;
+  public googlePlayProductId?: string;
+  public googlePlayLatestOrderId?: string;
   public variantId?: string;
   public currentPeriodEnd?: Date;
   public creditCardFee: number;
@@ -55,6 +65,11 @@ export class Tenant {
     this.createdAt = props.createdAt || new Date();
     this.externalCustomerId = props.externalCustomerId;
     this.externalSubscriptionId = props.externalSubscriptionId;
+    this.billingProvider = props.billingProvider;
+    this.googlePlayPurchaseTokenHash = props.googlePlayPurchaseTokenHash;
+    this.googlePlayObfuscatedAccountId = props.googlePlayObfuscatedAccountId;
+    this.googlePlayProductId = props.googlePlayProductId;
+    this.googlePlayLatestOrderId = props.googlePlayLatestOrderId;
     this.variantId = props.variantId;
     this.currentPeriodEnd = props.currentPeriodEnd;
     this.creditCardFee = props.creditCardFee !== undefined ? props.creditCardFee : 3.09;

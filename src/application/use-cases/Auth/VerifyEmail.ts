@@ -82,6 +82,8 @@ export class VerifyEmail {
           debitCardFee: tenant.debitCardFee,
           inviteCode: tenant.inviteCode,
           variantId: tenant.variantId,
+          billingProvider: tenant.billingProvider ||
+            (tenant.externalCustomerId ? "stripe" : tenant.plan === "monthly" ? "courtesy" : undefined),
         },
       },
     };

@@ -3,9 +3,72 @@ import Stripe from "stripe";
 import { ConfirmPayment } from "../../application/use-cases/Subscription/ConfirmPayment";
 import { loadEnv } from "../../main/config/env";
 import WebhookEventModel from "../../infrastructure/database/mongoose-models/WebhookEventModel";
+import GooglePlayNotificationModel from "../../infrastructure/database/mongoose-models/GooglePlayNotificationModel";
+import {
+  GooglePlayBilling,
+  GooglePlayBillingError,
+} from "../../application/use-cases/Subscription/GooglePlayBilling";
 
 export class WebhookController {
-  constructor(private confirmPayment: ConfirmPayment) {}
+  constructor(
+    private confirmPayment: ConfirmPayment,
+    private googlePlayBilling: GooglePlayBilling,
+  ) {}
+
+  async handleGooglePlay(req: Request, res: Response): Promise<void> {
+    try {
+      await this.googlePlayBilling.verifyPubSubAuthorization(req.get("authorization"));
+
+      const message = req.body?.message;
+      const messageId = typeof message?.messageId === "string" ? message.messageId : "";
+      const encodedData = typeof message?.data === "string" ? message.data : "";
+      if (!messageId || messageId.length > 256 || !encodedData) {
+        res.status(400).json({ error: "Notificação Pub/Sub inválida." });
+        return;
+      }
+
+      if (await GooglePlayNotificationModel.exists({ messageId })) {
+        res.status(204).send();
+        return;
+      }
+
+      let notification: any;
+      try {
+        notification = JSON.parse(Buffer.from(encodedData, "base64").toString("utf8"));
+      } catch {
+        res.status(400).json({ error: "Conteúdo da notificação inválido." });
+        return;
+      }
+
+      if (notification.testNotification) {
+        await GooglePlayNotificationModel.create({ messageId });
+        res.status(204).send();
+        return;
+      }
+
+      const purchaseToken = notification.subscriptionNotification?.purchaseToken;
+      const packageName = notification.packageName;
+      if (typeof purchaseToken !== "string" || typeof packageName !== "string") {
+        res.status(400).json({ error: "Notificação de assinatura inválida." });
+        return;
+      }
+
+      await this.googlePlayBilling.syncNotification(purchaseToken, packageName);
+      await GooglePlayNotificationModel.create({ messageId });
+      res.status(204).send();
+    } catch (error) {
+      if (error instanceof GooglePlayBillingError) {
+        res.status(error.statusCode).json({ error: error.message });
+        return;
+      }
+      if ((error as any)?.code === 11000) {
+        res.status(204).send();
+        return;
+      }
+      console.error("[GooglePlay RTDN] Falha ao processar notificação:", error);
+      res.status(500).json({ error: "Erro ao processar notificação." });
+    }
+  }
 
   async handleStripe(req: Request, res: Response): Promise<void> {
     const env = loadEnv();
